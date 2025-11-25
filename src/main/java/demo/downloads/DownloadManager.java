@@ -1,20 +1,18 @@
 package demo.downloads;
 
-import javafx.concurrent.Task;
-
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 
 public class DownloadManager {
 
-    private final Semaphore limit;
+    private volatile Semaphore limit;
     private final ExecutorService pool;
-    private final List<DownloadTask> tasks = new ArrayList<>();
+    private final List<DownloadTask> tasks = Collections.synchronizedList(new ArrayList<>());
 
     public DownloadManager(int maxConcurrent) {
         this.limit = new Semaphore(Math.max(1, maxConcurrent));
-        // pool con más hilos que el límite: el semáforo es quien “decide”
         this.pool = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r);
             t.setDaemon(true);
@@ -22,10 +20,21 @@ public class DownloadManager {
         });
     }
 
+    public synchronized void setMaxConcurrent(int newMax) {
+        if (newMax < 1) newMax = 1;
+        // reemplaza el semáforo para nuevas tareas
+        this.limit = new Semaphore(newMax);
+    }
+
+    // devuelve la referencia actual del semáforo para pasar a las tareas
+    public Semaphore currentSemaphore() {
+        return this.limit;
+    }
+
     public DownloadTask createAndSubmit(DownloadItem item) {
-        DownloadTask task = new DownloadTask(item, limit);
+        DownloadTask task = new DownloadTask(item, currentSemaphore());
         tasks.add(task);
-        pool.submit(task); // se pone a ejecutar (respetará el semáforo al iniciar)
+        pool.submit(task);
         return task;
     }
 
@@ -34,7 +43,7 @@ public class DownloadManager {
     }
 
     public void shutdown() {
-        for (Task<?> t : tasks) {
+        for (DownloadTask t : tasks) {
             t.cancel();
         }
         pool.shutdownNow();

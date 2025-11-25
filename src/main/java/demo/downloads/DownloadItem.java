@@ -2,8 +2,8 @@ package demo.downloads;
 
 public class DownloadItem {
     private final String name;
-    private final long sizeBytes;      // tamaño simulado
-    private final int speedKBps;       // velocidad simulada
+    private final long sizeBytes;
+    private final int speedKBps;
 
     public DownloadItem(String name, long sizeBytes, int speedKBps) {
         this.name = name;
